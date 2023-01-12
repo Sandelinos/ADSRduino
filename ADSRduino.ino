@@ -17,14 +17,7 @@
 // Pin definitions...
 const int gatePin = 2;
 const int modePin = 3;
-// MCP4921...
-// (pin allocations for convenience in hardware hook-up)
-const int DAC_CS = 6;
-const int DAC_SCK = 5;
-const int DAC_SDI = 4;
-const int DAC_LDAC = 8;
-byte upper_byte = 0x10;
-byte lower_byte = 0;
+const int outputPin = 5;
 
 float alpha=0.7;   // this is the pole location ('time constant') used for the first-order difference equation
 double alpha1=0.9;  // initial value for attack
@@ -46,44 +39,13 @@ boolean trigger = false;
 boolean decay = false;
 boolean release_done = true;
 
-// subroutine to set DAC on MCP4921
-void Set_DAC_4921(int DC_Value){
-    lower_byte=DC_Value&0xff;
-    upper_byte=(DC_Value>>8)&0x0f;
-    bitSet(upper_byte,4);
-    bitSet(upper_byte,5);   
-    digitalWrite(DAC_CS,LOW);
-    tfr_byte(upper_byte);
-    tfr_byte(lower_byte);
-    digitalWrite(DAC_SDI,LOW);   
-    digitalWrite(DAC_CS,HIGH);
-    digitalWrite(DAC_LDAC,LOW);
-    digitalWrite(DAC_LDAC,HIGH);
-
-}
-// transfers a byte, a bit at a time, LSB first to the DAC
-void tfr_byte(byte data)
-{
-  for (int i=0; i<8; i++, data<<=1) {
-    digitalWrite(DAC_SDI, data & 0x80);
-    pulseHigh(DAC_SCK);   //after each bit sent, CLK is pulsed high
-  }
+void set_output(int value) {
+  analogWrite(outputPin, value >> 4);
 }
 void setup() {
-  
-  pinMode(DAC_CS, OUTPUT);
-  pinMode(DAC_SCK, OUTPUT);
-  pinMode(DAC_SDI, OUTPUT);  
-  pinMode(DAC_LDAC, OUTPUT);  
   pinMode(gatePin, INPUT);  
-  pinMode(modePin, INPUT);    
-  digitalWrite(DAC_CS,HIGH);  
-  digitalWrite(DAC_LDAC,HIGH); 
-  digitalWrite(DAC_SCK,LOW);
-  digitalWrite(DAC_SDI,HIGH);
-  digitalWrite(gatePin,HIGH);   
-  digitalWrite(modePin,HIGH);  
-  Set_DAC_4921(0); 
+  pinMode(modePin, INPUT_PULLUP);
+  set_output(0);
 }
 
 void loop() {
@@ -106,7 +68,7 @@ void loop() {
   } 
   
     envelope=((1.0-alpha)*drive+alpha*envelope);     // implement difference equation: y(k) = (1 - alpha) * x(k) + alpha * y(k-1)
-    Set_DAC_4921(round(envelope));                   // and output the envelope to the DAC
+    set_output(round(envelope));                   // and output the envelope
 
      if((loop_mode==true)&&(decay==true) && (envelope<(float)(sustain_Level+1.0))){ // in loop mode, break out at the end of the decay
       decay = false;
@@ -124,7 +86,7 @@ void loop() {
   }    
   
     envelope=((1.0-alpha3)*drive+alpha3*envelope);   // implement the difference equation again (outside the while loop)
-    Set_DAC_4921(round(envelope));                   // and output envelope
+    set_output(round(envelope));                   // and output envelope
     gate=digitalRead(gatePin);                       // watch out for a new note
     scan+=1;                                         // prepare to look at a new parameter input
     if(envelope<4){                                  // is the release phase ended?
