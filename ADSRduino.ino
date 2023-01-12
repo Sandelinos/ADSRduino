@@ -3,16 +3,16 @@
 // a simple ADSR for the Arduino
 // m0xpd
 // Feb 2017
+// Modified by Sandelinos for PWM output
 //
 // see http://m0xpd.blogspot.co.uk/2017/02/signal-processing-on-arduino.html
 //
-// uses a Microchip MCP4921 DAC on digita pins 4,5,6 & 8 (see below)
+// outputs "16-bit" PWM from pins 10 (lower 8 bits) and 9 (higher 8 bits)
 // receives gate inputs on digital pin 2 (remember to protect e.g. with a 200R resistor and a 5V1 Zener diode)
 // and a loop mode input on digital pin 3 (pulling to 0V selects loop mode)
 //
 // Voltages between 0 and 5V (e.g. from potentiometers) on analog pins A0:A3 control Attack, Decay, Sustain & Release 
 
-#define pulseHigh(pin) {digitalWrite(pin, HIGH); digitalWrite(pin, LOW); }
 
 // Pin definitions...
 const int gatePin = 2;
@@ -40,11 +40,19 @@ boolean decay = false;
 boolean release_done = true;
 
 void set_output(int value) {
-  analogWrite(outputPin, value >> 4);
+  int value_16bit = value << 4; // "value" is 12-bit. Shift left to convert it to 16-bit.
+  OCR1A = value_16bit >> 8;
+  OCR1B = value_16bit;
 }
 void setup() {
+  pinMode(9, OUTPUT);	// OC1A
+  pinMode(10, OUTPUT);	// OC1B
   pinMode(gatePin, INPUT);  
   pinMode(modePin, INPUT_PULLUP);
+
+  TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(WGM10);
+  TCCR1B = _BV(CS10); // CS10 - CS12 select the clock source to be used (clkIO/1 = ~31kHz) datasheet section 15.11.2
+
   set_output(0);
 }
 
